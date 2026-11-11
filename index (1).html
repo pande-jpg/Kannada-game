@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Karnataka Underworld - Trial V1</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8fc8e8;font-family:Arial,sans-serif;touch-action:none}
+  #game{position:fixed;inset:0}canvas{display:block}
+  #brand{position:fixed;left:12px;top:10px;color:#fff;text-shadow:0 2px 5px #000;font-weight:900;font-size:18px;letter-spacing:1px;pointer-events:none}
+  #hud{position:fixed;right:10px;top:10px;color:white;background:#111b;padding:9px 12px;border:1px solid #ffffff55;border-radius:12px;font-weight:bold;text-shadow:0 1px 3px #000;pointer-events:none}
+  #mission{position:fixed;left:12px;top:52px;max-width:245px;background:#101923dc;color:white;padding:10px 12px;border-left:4px solid #ffc928;border-radius:8px;font-size:13px;line-height:1.4;pointer-events:none}
+  #help{position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#111b;color:#fff;padding:7px 10px;border-radius:20px;font-size:11px;white-space:nowrap;pointer-events:none}
+  #controls{position:fixed;inset:0;pointer-events:none}
+  #stick{position:absolute;left:22px;bottom:24px;width:122px;height:122px;border-radius:50%;background:#1117;border:2px solid #fff9;pointer-events:auto;touch-action:none}
+  #nub{position:absolute;left:36px;top:36px;width:46px;height:46px;border-radius:50%;background:#ffffffa8;border:2px solid white}
+  .btn{position:absolute;right:18px;width:68px;height:68px;border-radius:50%;border:2px solid #fff;background:#111b;color:white;font-weight:bold;font-size:11px;pointer-events:auto;touch-action:none;box-shadow:0 3px 10px #0006}
+  #run{bottom:28px}#ride{bottom:108px}#jump{bottom:188px}
+  #status{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);color:white;background:#111b;padding:6px 10px;border-radius:8px;font-size:12px;white-space:nowrap;pointer-events:none}
+  @media (min-width:800px){#stick{width:140px;height:140px;left:28px;bottom:28px}#nub{left:44px;top:44px}.btn{width:62px;height:62px}#help{font-size:13px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="brand">👑 KARNATAKA UNDERWORLD</div>
+<div id="hud">💵 ₹25,000 &nbsp; ♥ 100</div>
+<div id="mission">🟡 <b>TRIAL MISSION</b><br>Explore the Bengaluru streets. Find your bike and ride around the city.</div>
+<div id="help">Move: joystick / WASD &nbsp; • &nbsp; Ride: BIKE button</div>
+<div id="controls">
+  <div id="stick"><div id="nub"></div></div>
+  <button class="btn" id="jump">JUMP</button>
+  <button class="btn" id="ride">BIKE</button>
+  <button class="btn" id="run">RUN</button>
+</div>
+<div id="status">Explore the city • Trial V1</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(() => {
+  const root=document.getElementById('game');
+  if(!window.THREE){root.innerHTML='<div style="color:white;padding:25px">3D library could not load. Check internet and refresh.</div>';return;}
+  const scene=new THREE.Scene();
+  scene.background=new THREE.Color(0x91c9e8);
+  scene.fog=new THREE.Fog(0x91c9e8,90,260);
+  const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,500);
+  const renderer=new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  root.appendChild(renderer.domElement);
+  scene.add(new THREE.HemisphereLight(0xffffff,0x71815e,2.0));
+  const sun=new THREE.DirectionalLight(0xfff0d5,2.2);sun.position.set(-35,70,30);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+  const mat=(c,r=.8)=>new THREE.MeshStandardMaterial({color:c,roughness:r});
+  const ground=new THREE.Mesh(new THREE.PlaneGeometry(500,500),mat(0x668c50));ground.rotation.x=-Math.PI/2;ground.position.y=-.08;ground.receiveShadow=true;scene.add(ground);
+  const roadMat=mat(0x30343a),lineMat=mat(0xf5e8a8),sideMat=mat(0xaaa9a1);
+  function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;scene.add(o);return o;}
+  // city roads in a simple grid
+  for(let i=-3;i<=3;i++){
+    box(13,.12,500,roadMat,i*48,.01,0,false);
+    box(500,.12,13,roadMat,0,.012,i*48,false);
+    for(let z=-230;z<240;z+=12)box(.16,.025,4,lineMat,i*48,.09,z,false);
+    for(let x=-230;x<240;x+=12)box(4,.025,.16,lineMat,x,.09,i*48,false);
+  }
+  // sidewalks
+  for(let i=-3;i<=3;i++){
+    box(2,.18,500,sideMat,i*48+8,.04,0,false);box(2,.18,500,sideMat,i*48-8,.04,0,false);
+    box(500,.18,2,sideMat,0,.04,i*48+8,false);box(500,.18,2,sideMat,0,.04,i*48-8,false);
+  }
+  // Buildings
+  const buildingMats=[0xd6b994,0xc8c4b6,0xd1a27c,0x9daeb3,0xe0d6c5,0xb9c5ae].map(c=>mat(c));
+  for(let gx=-4;gx<=4;gx++)for(let gz=-4;gz<=4;gz++){
+    if(Math.abs(gx)<=1&&Math.abs(gz)<=1)continue;
+    const x=gx*48+(gx%2?17:-17),z=gz*48+(gz%2?17:-17);
+    const w=18+Math.random()*9,d=18+Math.random()*9,h=12+Math.random()*35;
+    const b=box(w,h,d,buildingMats[Math.floor(Math.random()*buildingMats.length)],x,h/2,z);
+    // window bands
+    for(let yy=3;yy<h-2;yy+=4){
+      for(let xx=-w/2+2;xx<w/2-1;xx+=3.2){
+        const win=box(1.15,1.35,.08,mat(0x83b9c9),x+xx,yy,z+d/2+.045,false);
+      }
+    }
+    box(w+1,.6,d+1,mat(0x77736b),x,h+.3,z,false);
+  }
+  // landmark-style civic building
+  const landmarkX=0,landmarkZ=-92;
+  box(34,13,14,mat(0xd2b18a),landmarkX,6.5,landmarkZ);
+  for(let i=-2;i<=2;i++)box(2,10,2,mat(0xf0d7ad),i*6,5,landmarkZ+7);
+  box(38,1,17,mat(0xb78d5e),0,13.5,landmarkZ);
+  for(let i=-1;i<=1;i++){const dome=new THREE.Mesh(new THREE.SphereGeometry(3,16,12,0,Math.PI*2,0,Math.PI/2),mat(0xc59a58));dome.position.set(i*12,14,landmarkZ);scene.add(dome);}
+  // trees
+  function tree(x,z){const trunk=new THREE.Mesh(new THREE.CylinderGeometry(.35,.5,4,7),mat(0x765034));trunk.position.set(x,2,z);scene.add(trunk);const crown=new THREE.Mesh(new THREE.SphereGeometry(2.6,9,7),mat(0x28713a));crown.position.set(x,5,z);crown.castShadow=true;scene.add(crown);}
+  for(let i=0;i<75;i++){let x=(Math.random()-.5)*360,z=(Math.random()-.5)*360;if(Math.abs(x%48)<11||Math.abs(z%48)<11)continue;tree(x,z);}
+  // Player: shirt, dhoti, head, hair, arms and legs
+  const player=new THREE.Group();scene.add(player);
+  const shirt=mat(0x20252c),cloth=mat(0xf1eee2),skin=mat(0x9a6347),hair=mat(0x171311),shoe=mat(0x252525);
+  function part(parent,g,m,x,y,z){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
+  part(player,new THREE.BoxGeometry(1.05,1.15,.55),shirt,0,2.05,0);
+  part(player,new THREE.CylinderGeometry(.48,.52,.9,10),cloth,0,1.05,0);
+  part(player,new THREE.SphereGeometry(.34,14,12),skin,0,2.95,0);
+  part(player,new THREE.SphereGeometry(.35,12,8),hair,0,3.13,-.04);
+  const armL=part(player,new THREE.BoxGeometry(.24,.95,.28),skin,-.68,2.05,0);
+  const armR=part(player,new THREE.BoxGeometry(.24,.95,.28),skin,.68,2.05,0);
+  const legL=part(player,new THREE.BoxGeometry(.27,.75,.3),skin,-.27,.42,0);
+  const legR=part(player,new THREE.BoxGeometry(.27,.75,.3),skin,.27,.42,0);
+  part(player,new THREE.BoxGeometry(.38,.18,.55),shoe,-.27,.12,.08);
+  part(player,new THREE.BoxGeometry(.38,.18,.55),shoe,.27,.12,.08);
+  player.position.set(0,0,0);
+  // Bike model
+  const bike=new THREE.Group();scene.add(bike);
+  const black=mat(0x16191d),red=mat(0xb51e25),metal=mat(0x888d91);
+  function wheel(parent,x,z){const w=new THREE.Mesh(new THREE.TorusGeometry(.48,.12,8,18),black);w.rotation.y=Math.PI/2;w.position.set(x,.55,z);parent.add(w);const hub=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,.18,12),metal);hub.rotation.z=Math.PI/2;hub.position.copy(w.position);parent.add(hub);}
+  wheel(bike,-.95,0);wheel(bike,.95,0);
+  const frame=part(bike,new THREE.BoxGeometry(1.6,.18,.22),red,0,1.02,0);
+  part(bike,new THREE.BoxGeometry(.65,.22,.55),black,0,1.42,0);
+  part(bike,new THREE.BoxGeometry(.55,.16,.3),red,.38,1.25,0);
+  part(bike,new THREE.BoxGeometry(.12,.85,.12),metal,.82,1.05,0);
+  part(bike,new THREE.BoxGeometry(.8,.08,.12),black,.82,1.48,0);
+  bike.position.set(7,0,4);
+  // vehicles
+  function car(x,z,color=0xe7e8e7){const g=new THREE.Group();scene.add(g);const body=mat(color),glass=mat(0x4e788a);part(g,new THREE.BoxGeometry(4,1.1,2),body,0,.85,0);part(g,new THREE.BoxGeometry(2.2,.85,1.7),glass,-.1,1.75,0);for(const xx of [-1.3,1.3])for(const zz of [-1,1]){const wh=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.25,12),black);wh.rotation.x=Math.PI/2;wh.position.set(xx,.45,zz);g.add(wh);}g.position.set(x,0,z);return g;}
+  const car1=car(-9,12,0xe4e4dc),car2=car(12,-18,0x9a2727);
+  function bus(x,z){const g=new THREE.Group();scene.add(g);part(g,new THREE.BoxGeometry(9,3.5,2.7),mat(0x0876c8),0,2,0);part(g,new THREE.BoxGeometry(8.5,1.1,2.74),mat(0x9ed6e8),0,2.75,0);for(let i=-3;i<=3;i++)part(g,new THREE.BoxGeometry(.8,.8,.05),mat(0x244e63),i*1.1,2.75,1.4);g.position.set(x,0,z);return g;}
+  const bus1=bus(-22,31);
+  function auto(x,z){const g=new THREE.Group();scene.add(g);part(g,new THREE.BoxGeometry(2.4,1.4,1.8),mat(0x15954c),0,.9,0);part(g,new THREE.BoxGeometry(1.5,.8,1.7),mat(0xe8c72c),-.1,1.9,0);g.position.set(x,0,z);return g;}
+  auto(19,10);
+  // floating labels
+  function label(text,x,z){const c=document.createElement('canvas');c.width=512;c.height=96;const ctx=c.getContext('2d');ctx.fillStyle='rgba(0,0,0,.65)';ctx.fillRect(0,0,512,96);ctx.fillStyle='white';ctx.font='bold 38px Arial';ctx.textAlign='center';ctx.fillText(text,256,62);const tex=new THREE.CanvasTexture(c);const m=new THREE.Mesh(new THREE.PlaneGeometry(15,2.8),new THREE.MeshBasicMaterial({map:tex,transparent:true,side:THREE.DoubleSide}));m.position.set(x,13,z);scene.add(m);}
+  label('BENGALURU • KARNATAKA',0,-38);
+  label('CITY MARKET',-48,12);
+  // controls
+  let joyX=0,joyY=0,keys={},running=false,riding=false,jumpV=0,vy=0,angle=0;
+  const stick=document.getElementById('stick'),nub=document.getElementById('nub');
+  function setJoy(e){const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=43,len=Math.hypot(dx,dy)||1;if(len>max){dx=dx/len*max;dy=dy/len*max;}joyX=dx/max;joyY=dy/max;nub.style.transform=`translate(${dx}px,${dy}px)`;}
+  stick.addEventListener('pointerdown',e=>{stick.setPointerCapture(e.pointerId);setJoy(e);});
+  stick.addEventListener('pointermove',e=>{if(e.buttons||e.pressure)setJoy(e);});
+  function release(){joyX=0;joyY=0;nub.style.transform='translate(0,0)';}
+  stick.addEventListener('pointerup',release);stick.addEventListener('pointercancel',release);
+  addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(e.key==='Shift')running=true;});
+  addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;if(e.key==='Shift')running=false;});
+  document.getElementById('run').addEventListener('pointerdown',()=>running=true);
+  document.getElementById('run').addEventListener('pointerup',()=>running=false);
+  document.getElementById('run').addEventListener('pointercancel',()=>running=false);
+  document.getElementById('jump').addEventListener('click',()=>{if(!riding&&player.position.y<.03)vy=7;});
+  const status=document.getElementById('status');
+  document.getElementById('ride').addEventListener('click',()=>{
+    if(!riding&&player.position.distanceTo(bike.position)<5){riding=true;player.visible=false;status.textContent='Bike mode ON • Use joystick to ride';}
+    else if(riding){riding=false;player.visible=true;player.position.copy(bike.position);player.position.x+=2;status.textContent='You got off the bike';}
+    else status.textContent='Move closer to the red bike to ride it';
+  });
+  // initial camera
+  camera.position.set(0,7,11);
+  const clock=new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);
+    let forward=-(joyY||((keys.w||keys.arrowup)?1:0)-((keys.s||keys.arrowdown)?1:0));
+    let side=(joyX||((keys.d||keys.arrowright)?1:0)-((keys.a||keys.arrowleft)?1:0));
+    const mag=Math.hypot(side,forward);if(mag>1){side/=mag;forward/=mag;}
+    const speed=riding?18:(running?9:5);
+    if(Math.abs(side)+Math.abs(forward)>.02){
+      angle=Math.atan2(side,forward);
+      const dx=Math.sin(angle)*speed*dt,dz=Math.cos(angle)*speed*dt;
+      if(riding){bike.position.x+=dx;bike.position.z+=dz;bike.rotation.y=angle;player.position.copy(bike.position);}
+      else{player.position.x+=dx;player.position.z+=dz;player.rotation.y=angle;}
+    }
+    if(!riding){vy-=18*dt;player.position.y+=vy*dt;if(player.position.y<0){player.position.y=0;vy=0;}
+      const moving=mag>.08;const swing=moving?Math.sin(performance.now()*.012)*.35:0;legL.rotation.x=swing;legR.rotation.x=-swing;armL.rotation.x=-swing;armR.rotation.x=swing;
+    } else {bike.position.y=0;}
+    const target=riding?bike.position:player.position;
+    const desired=new THREE.Vector3(target.x, target.y+6.2, target.z+10.5);
+    camera.position.lerp(desired,1-Math.pow(.001,dt));
+    camera.lookAt(target.x,target.y+1.5,target.z);
+    // keep player inside city bounds
+    const active=riding?bike:player;active.position.x=THREE.MathUtils.clamp(active.position.x,-225,225);active.position.z=THREE.MathUtils.clamp(active.position.z,-225,225);
+    renderer.render(scene,camera);
+  }
+  animate();
+  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+})();
+</script>
+</body>
+</html>
